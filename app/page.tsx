@@ -1,20 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { useState } from "react";
 import AIAgent from "@/app/components/AIAgent";
 
-// Lazy-load MapView
-const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
-
 export default function VillageConnectLanding() {
-  const [showMap, setShowMap] = useState(false);
-
-  if (showMap) {
-    return <MapView />;
-  }
-
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-green-50 via-amber-50 to-emerald-100 text-center p-6">
       {/* 🌾 Hero Section */}
@@ -60,18 +49,12 @@ export default function VillageConnectLanding() {
         >
           🔐 Login / Sign Up
         </Link>
-
-        <button
-          onClick={() => setShowMap(true)}
-          className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-semibold shadow-md hover:bg-emerald-700 transition duration-300"
-        >
-          🌍 Explore Map
-        </button>
       </div>
 
       {/* 🌿 Footer */}
       <footer className="mt-14 text-gray-500 text-sm">
-        🌱 Built with love for rural innovation • © {new Date().getFullYear()} VillageConnect
+        🌱 Built with love for rural innovation • © {new Date().getFullYear()}{" "}
+        VillageConnect
       </footer>
 
       {/* 🤖 Floating AI Agent */}

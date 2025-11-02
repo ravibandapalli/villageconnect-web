@@ -11,12 +11,17 @@ export default function MyVideos() {
   const [videoToDelete, setVideoToDelete] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // 🆕 Edit modal state
+  const [videoToEdit, setVideoToEdit] = useState<any | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // ✅ Fetch videos
   useEffect(() => {
     const fetchVideos = async () => {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
-
       if (!user) {
         setVideos([]);
         setLoading(false);
@@ -32,77 +37,59 @@ export default function MyVideos() {
       if (!error && data) setVideos(data);
       setLoading(false);
     };
-
     fetchVideos();
   }, []);
 
-  // ✅ AI Caption/Description using direct OpenAI route
-const handleAI = async (video: any) => {
-  try {
-    // Step 1️⃣: Validate video
-    if (!video?.title) {
-      console.error("Missing video title for AI description");
+  // ✅ AI Caption/Description
+  const handleAI = async (video: any) => {
+    try {
+      if (!video?.title) {
+        setAIResults((prev) => ({
+          ...prev,
+          [video.id]: "❌ Missing video title — cannot generate AI description.",
+        }));
+        return;
+      }
+
       setAIResults((prev) => ({
         ...prev,
-        [video.id]: "❌ Missing video title — cannot generate AI description.",
+        [video.id]: "🤖 Generating AI description...",
       }));
-      return;
-    }
 
-    // Step 2️⃣: Set loading message
-    setAIResults((prev) => ({
-      ...prev,
-      [video.id]: "🤖 Generating AI description...",
-    }));
+      const prompt = `Write a short, engaging description and 3 relevant hashtags for a video titled "${video.title}". Make it suitable for social media sharing.`;
 
-    // Step 3️⃣: Build the AI prompt
-    const prompt = `Write a short, engaging description and 3 relevant hashtags for a video titled "${video.title}". Make it suitable for social media sharing.`;
+      const response = await fetch("/api/ai-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
 
-    console.log("📤 Sending AI request with prompt:", prompt);
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("AI API Error:", errorData);
+        setAIResults((prev) => ({
+          ...prev,
+          [video.id]: "⚠️ AI request failed — please try again later.",
+        }));
+        return;
+      }
 
-    // Step 4️⃣: Call your Next.js API route
-    const response = await fetch("/api/ai-description", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt }), // ✅ Ensure the key matches backend expectation
-    });
+      const data = await response.json();
+      const result =
+        data?.result?.trim() || "⚠️ No AI response received from the server.";
 
-    console.log("📥 Response status:", response.status);
-
-    // Step 5️⃣: Handle possible errors
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("AI API Error:", errorData);
       setAIResults((prev) => ({
         ...prev,
-        [video.id]: "⚠️ AI request failed — please try again later.",
+        [video.id]: result,
       }));
-      return;
+    } catch (err) {
+      console.error("💥 AI request failed:", err);
+      setAIResults((prev) => ({
+        ...prev,
+        [video.id]: "❌ Network or server error during AI request.",
+      }));
     }
-
-    // Step 6️⃣: Parse JSON response
-    const data = await response.json();
-    console.log("✅ AI API result:", data);
-
-    const result =
-      data?.result?.trim() || "⚠️ No AI response received from the server.";
-
-    // Step 7️⃣: Update state
-    setAIResults((prev) => ({
-      ...prev,
-      [video.id]: result,
-    }));
-  } catch (err) {
-    console.error("💥 AI request failed:", err);
-    setAIResults((prev) => ({
-      ...prev,
-      [video.id]: "❌ Network or server error during AI request.",
-    }));
-  }
-};
-          
+  };
 
   // ✅ Delete Video
   const confirmDelete = (video: any) => setVideoToDelete(video);
@@ -112,7 +99,8 @@ const handleAI = async (video: any) => {
     setDeleting(true);
     try {
       const filePath = videoToDelete.video_url.split("/").pop();
-      if (filePath) await supabase.storage.from("videos").remove([filePath]);
+      if (filePath)
+        await supabase.storage.from("videos").remove([filePath]);
       await supabase.from("videos").delete().eq("id", videoToDelete.id);
       setVideos((prev) => prev.filter((v) => v.id !== videoToDelete.id));
     } catch (err) {
@@ -121,6 +109,43 @@ const handleAI = async (video: any) => {
     }
     setDeleting(false);
     setVideoToDelete(null);
+  };
+
+  // 🆕 Edit Video
+  const handleEditClick = (video: any) => {
+    setVideoToEdit(video);
+    setEditTitle(video.title || "");
+    setEditDescription(video.description || "");
+  };
+
+  const handleEditSave = async () => {
+    if (!videoToEdit) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from("videos")
+        .update({
+          title: editTitle,
+          description: editDescription,
+        })
+        .eq("id", videoToEdit.id);
+
+      if (error) throw error;
+
+      setVideos((prev) =>
+        prev.map((v) =>
+          v.id === videoToEdit.id
+            ? { ...v, title: editTitle, description: editDescription }
+            : v
+        )
+      );
+
+      setVideoToEdit(null);
+    } catch (err) {
+      console.error("Edit save error:", err);
+      alert("Failed to update video details. Please try again.");
+    }
+    setSavingEdit(false);
   };
 
   // ✅ Loading
@@ -157,7 +182,9 @@ const handleAI = async (video: any) => {
                   controls
                   className="rounded-xl mb-3 w-full aspect-video shadow-md"
                 />
-                <h2 className="font-semibold text-green-800 mb-1">{v.title}</h2>
+                <h2 className="font-semibold text-green-800 mb-1">
+                  {v.title}
+                </h2>
                 <p className="text-xs text-gray-500">
                   {new Date(v.created_at).toLocaleString()}
                 </p>
@@ -168,7 +195,16 @@ const handleAI = async (video: any) => {
                     onClick={() => handleAI(v)}
                     className="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 transition"
                   >
-                    {aiResults[v.id] ? "✅ AI Description Ready" : "AI Description"}
+                    {aiResults[v.id]
+                      ? "✅ AI Description Ready"
+                      : "AI Description"}
+                  </button>
+
+                  <button
+                    onClick={() => handleEditClick(v)}
+                    className="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+                  >
+                    ✏️ Edit
                   </button>
 
                   <button
@@ -206,7 +242,8 @@ const handleAI = async (video: any) => {
               Delete Video?
             </h2>
             <p className="text-gray-700 mb-4">
-              Are you sure you want to delete <strong>{videoToDelete.title}</strong>?
+              Are you sure you want to delete{" "}
+              <strong>{videoToDelete.title}</strong>?
             </p>
             <div className="flex gap-3 justify-center">
               <button
@@ -222,6 +259,51 @@ const handleAI = async (video: any) => {
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
               >
                 {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Edit Modal */}
+      {videoToEdit && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-50">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md mx-3">
+            <h2 className="text-xl font-bold text-blue-700 mb-3 text-center">
+              ✏️ Edit Video Details
+            </h2>
+
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Title
+            </label>
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 mb-3 focus:ring-2 focus:ring-blue-400"
+            />
+
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              className="w-full border border-gray-300 rounded px-3 py-2 h-24 mb-4 focus:ring-2 focus:ring-blue-400"
+            />
+
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setVideoToEdit(null)}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditSave}
+                disabled={savingEdit}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              >
+                {savingEdit ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>

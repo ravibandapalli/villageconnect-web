@@ -24,7 +24,7 @@ export default function AuthPage() {
       if (error) setMessage("❌ " + error.message);
       else {
         setMessage("✅ Logged in successfully!");
-        router.push("/upload"); // ✅ Redirect to upload
+        router.push("/profile"); // ✅ Redirect to profile
       }
     } else {
       const { error } = await supabase.auth.signUp({

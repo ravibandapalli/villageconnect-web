@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
@@ -57,6 +58,38 @@ export default function ProfilePage() {
     }
   }
 
+  // ✅ Avatar Upload
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      const file = e.target.files?.[0];
+      if (!file || !profile?.id) return;
+
+      const fileExt = file.name.split(".").pop();
+      const filePath = `${profile.id}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      const avatarUrl = data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarUrl })
+        .eq("id", profile.id);
+
+      if (updateError) throw updateError;
+
+      setProfile({ ...profile, avatar_url: avatarUrl });
+      setMessage("✅ Avatar updated!");
+    } catch (err: any) {
+      setMessage("❌ Upload failed: " + err.message);
+    }
+  }
+
   // ✅ Logout
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -66,7 +99,9 @@ export default function ProfilePage() {
   if (loading)
     return (
       <main className="flex items-center justify-center min-h-screen bg-gradient-to-b from-green-50 via-yellow-50 to-emerald-100">
-        <p className="text-green-800 font-semibold animate-pulse">Loading your profile...</p>
+        <p className="text-green-800 font-semibold animate-pulse">
+          Loading your profile...
+        </p>
       </main>
     );
 
@@ -84,16 +119,31 @@ export default function ProfilePage() {
 
       {/* Profile Card */}
       <div className="bg-white/90 backdrop-blur-md p-8 rounded-3xl shadow-2xl w-full max-w-md border border-green-100 relative z-10">
-        <h1 className="text-3xl font-extrabold text-green-700 mb-6 text-center">👤 My Profile</h1>
+        <h1 className="text-3xl font-extrabold text-green-700 mb-6 text-center">
+          👤 My Profile
+        </h1>
 
         {profile ? (
           <>
             <div className="text-center mb-6">
-              <img
-                src={profile.avatar_url || "https://i.imgur.com/8Km9tLL.png"}
-                alt="Profile Avatar"
-                className="w-24 h-24 rounded-full mx-auto mb-3 border-4 border-green-300 shadow-md"
-              />
+              <label htmlFor="avatar-upload" className="cursor-pointer">
+                <img
+                  src={
+                    profile.avatar_url ||
+                    "https://i.imgur.com/8Km9tLL.png"
+                  }
+                  alt="Profile Avatar"
+                  className="w-24 h-24 rounded-full mx-auto mb-3 border-4 border-green-300 shadow-md hover:opacity-80 transition"
+                />
+                <input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </label>
+
               {editing ? (
                 <>
                   <input
@@ -125,9 +175,9 @@ export default function ProfilePage() {
                   </h2>
                   <p className="text-gray-600 mt-1">{profile.email}</p>
                   <p className="text-gray-400 text-sm mt-2">
-                    Joined: {new Date(profile.created_at).toLocaleDateString()}
+                    Joined:{" "}
+                    {new Date(profile.created_at).toLocaleDateString()}
                   </p>
-
                   <button
                     onClick={() => setEditing(true)}
                     className="mt-4 bg-yellow-500 text-white px-5 py-2 rounded-lg shadow-md hover:bg-yellow-600 transition"
@@ -143,6 +193,7 @@ export default function ProfilePage() {
                 {message}
               </p>
             )}
+
             <SmartBackButton fallback="/my-videos" />
 
             <button
@@ -157,7 +208,6 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Footer */}
       <footer className="mt-10 text-gray-500 text-xs text-center">
         🌱 VillageConnect • Connecting hearts, sharing stories
       </footer>

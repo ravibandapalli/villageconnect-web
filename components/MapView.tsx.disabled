@@ -1,0 +1,48 @@
+"use client";
+
+import { useState } from "react";
+import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
+import * as L from "leaflet";
+
+// Fix default icon issue for Next.js
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import iconShadow from "leaflet/dist/images/marker-shadow.png";
+
+const DefaultIcon = L.icon({
+  iconUrl,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
+
+export default function MapView() {
+  const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(null);
+
+  function MapClickHandler() {
+    useMapEvents({
+      click(e) {
+        setMarker({ lat: e.latlng.lat, lng: e.latlng.lng });
+      },
+    });
+    return null;
+  }
+
+  return (
+    <MapContainer
+      center={[17.385044, 78.486671]} // Hyderabad default
+      zoom={13}
+      style={{ height: "400px", width: "100%" }}
+    >
+      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <MapClickHandler />
+      {marker && (
+        <Marker position={[marker.lat, marker.lng]}>
+          <Popup>Marker at this location</Popup>
+        </Marker>
+      )}
+    </MapContainer>
+  );
+}
