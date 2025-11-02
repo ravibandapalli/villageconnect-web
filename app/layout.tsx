@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import DebugConsole from "./components/DebugConsole";
-import ProfileIcon from "./components/ProfileIcon"; // ✅ Add this import
+import ProfileIcon from "./components/ProfileIcon";
+import DebugConsole from "./components/DebugConsole"; // ✅ Keep import, auto-hide in production
 
 export const metadata: Metadata = {
   title: "VillageConnect",
@@ -28,13 +28,13 @@ export default function RootLayout({
       </head>
 
       <body className="relative">
-        {/* ✅ Global profile icon visible on all pages */}
+        {/* ✅ Profile icon visible globally */}
         <ProfileIcon />
 
         {children}
 
-        {/* Optional debug console */}
-        <DebugConsole />
+        {/* 🧩 Debug console appears only in development */}
+        {process.env.NODE_ENV !== "production" && <DebugConsole />}
       </body>
     </html>
   );
